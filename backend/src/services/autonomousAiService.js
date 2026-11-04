@@ -38,7 +38,17 @@ async function askGemini(prompt, frames, metadata) {
   if (!key) return null;
   const parts = [{ text: `You are an autonomous professional video editor. Analyze the user request, video metadata and sampled chronological frames. Return ONLY valid JSON with keys: summary (string), aspectRatio ("9:16"|"16:9"|"1:1"), resolution ("1080p"|"4k"), operations (array), subtitles (array). Allowed operations: {"type":"TRIM_TIMELINE","position":"start"|"end","duration":number}, {"type":"APPLY_COLOR_GRADE","preset":"teal_orange"|"moody_warm"|"natural"|"cinematic"}, {"type":"SET_ASPECT_RATIO","aspectRatio":"9:16"|"16:9"|"1:1"}. Do not invent speech, subtitles, dialogue or background music from silent sampled frames. Make conservative edits; preserve important content. User request: ${prompt}. Metadata: ${JSON.stringify(metadata)}. Frame timestamps are included with each image.` }];
   frames.forEach(frame => parts.push({ text: `Frame at ${frame.time} seconds` }, { inline_data: { mime_type: 'image/jpeg', data: frame.data } }));
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(process.env.GEMINI_MODEL || 'gemini-2.5-flash')}:generateContent?key=${encodeURIComponent(key)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }) });
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(process.env.GEMINI_MODEL || 'gemini-3.8-flash')}:generateContent?key=${encodeURIComponent(key)}`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    contents: [{ role: 'user', parts }],
+    generationConfig: {
+      temperature: 0.2,
+      responseMimeType: 'application/json'
+    }
+  })
+});
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error?.message || `Gemini API error ${response.status}`);
   return parseJson(payload.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n'));
