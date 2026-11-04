@@ -12,7 +12,7 @@ const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 const authRoutes = require('./routes/authRoutes');
 const storageRoutes = require('./routes/storageRoutes');
-const { configured: r2Configured } = require('./services/r2Storage');
+const { configured: cloudinaryConfigured } = require('./services/cloudinaryStorage');
 
 const chatRoutes = require('./routes/chatRoutes');
 const projectRoutes = require('./routes/projectRoutes');
@@ -90,7 +90,8 @@ app.get('/api/health', (req, res) => {
     product: 'REDDY AI STUDIO',
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    objectStorage: r2Configured() ? 'configured' : 'not_configured'
+    objectStorage: cloudinaryConfigured() ? 'cloudinary_configured' : 'not_configured',
+    mediaStorage: cloudinaryConfigured() ? 'Cloudinary' : 'not_configured'
   });
 });
 
