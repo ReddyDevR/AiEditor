@@ -82,12 +82,53 @@ function normalizePlan(plan, prompt, metadata) {
 }
 
 async function createAutonomousPlan(videoPath, prompt, metadata, tempDir) {
-  const frames = await sampleFrames(videoPath, metadata.duration, tempDir);
-  let plan = await askGemini(prompt, frames, metadata);
-  let provider = 'gemini';
-  if (!plan) { plan = await askClaude(prompt, frames, metadata); provider = 'claude'; }
-  if (!plan) throw new Error('AI provider missing. Set GEMINI_API_KEY or ANTHROPIC_API_KEY in backend environment variables.');
-  return { ...normalizePlan(plan, prompt, metadata), provider };
-}
+  const frames = await sampleFrames(
+    videoPath,
+    metadata.duration,
+    tempDir
+  );
 
+  let plan = null;
+  let provider = null;
+  let geminiError = null;
+
+  // First try Gemini
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      plan = await askGemini(prompt, frames, metadata);
+      if (plan) provider = 'gemini';
+    } catch (error) {
+      geminiError = error;
+      console.error('Gemini failed:', error.message);
+    }
+  }
+
+  // Automatically switch to Claude if Gemini fails
+  if (!plan && process.env.ANTHROPIC_API_KEY) {
+    try {
+      console.log('Switching to Claude AI...');
+      plan = await askClaude(prompt, frames, metadata);
+
+      if (plan) provider = 'claude';
+    } catch (error) {
+      console.error('Claude failed:', error.message);
+      throw new Error(
+        `Both AI providers failed. Gemini: ${
+          geminiError?.message || 'Unavailable'
+        }. Claude: ${error.message}`
+      );
+    }
+  }
+
+  if (!plan) {
+    throw new Error(
+      'No AI provider available. Configure GEMINI_API_KEY or ANTHROPIC_API_KEY.'
+    );
+  }
+
+  return {
+    ...normalizePlan(plan, prompt, metadata),
+    provider
+  };
+}
 module.exports = { createAutonomousPlan };
