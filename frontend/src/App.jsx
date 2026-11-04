@@ -299,7 +299,7 @@ export default function App() {
               <h2 className="text-xl font-display font-extrabold text-white">Media Asset Library</h2>
               <p className="text-xs text-slate-400">All uploaded clips, generated samples, and audio assets.</p>
               <div className="p-4 bg-studio-card border border-studio-border rounded-xl text-xs text-slate-300">
-                Media files are stored in <span className="font-mono text-amber-300">backend/uploads</span> and rendered in 1080p/4K.
+                Media files are stored securely in <span className="font-mono text-amber-300">Cloudinary</span> and processed in 1080p/4K.
               </div>
             </div>
           )}
@@ -309,7 +309,7 @@ export default function App() {
               <h2 className="text-xl font-display font-extrabold text-white">Export & Download History</h2>
               <p className="text-xs text-slate-400">Previously completed master renders and download links.</p>
               <div className="p-4 bg-studio-card border border-studio-border rounded-xl text-xs text-slate-300">
-                Exports are saved in <span className="font-mono text-emerald-400">backend/exports</span> as high-bitrate H.264 MP4s.
+                Completed exports are saved in <span className="font-mono text-emerald-400">Cloudinary</span> as high-bitrate H.264 MP4s.
               </div>
             </div>
           )}
