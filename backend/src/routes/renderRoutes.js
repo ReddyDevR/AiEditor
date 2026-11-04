@@ -10,10 +10,20 @@ const path = require('path');
 const fs = require('fs');
 const { ffmpegService } = require('../services/ffmpegService');
 const { renderJobsStore, projectsStore, mediaStore } = require('../database/jsonStore');
+const cloudinaryStorage = require('../services/cloudinaryStorage');
+const { Readable } = require('stream');
+const { pipeline } = require('stream/promises');
 
 const EXPORTS_DIR = path.join(__dirname, '..', '..', 'exports');
 if (!fs.existsSync(EXPORTS_DIR)) {
   fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+}
+
+
+async function downloadToFile(url, destination) {
+  const response = await fetch(url);
+  if (!response.ok || !response.body) throw new Error(`Unable to download source video (${response.status})`);
+  await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(destination));
 }
 
 // Active SSE client connections map
@@ -109,8 +119,14 @@ router.post('/start', async (req, res) => {
     (async () => {
       try {
         let inputVideoPath = media?.filePath;
+        let downloadedSourcePath = null;
+        if ((!inputVideoPath || !fs.existsSync(inputVideoPath)) && media?.videoUrl) {
+          downloadedSourcePath = path.join(EXPORTS_DIR, `source_${jobId}.mp4`);
+          await downloadToFile(media.videoUrl, downloadedSourcePath);
+          inputVideoPath = downloadedSourcePath;
+        }
 
-        // If no video uploaded yet, generate a high-quality sample video to process!
+        // If no video uploaded yet, generate a high-quality sample video to process.
         if (!inputVideoPath || !fs.existsSync(inputVideoPath)) {
           const samplePath = path.join(EXPORTS_DIR, `temp_source_${Date.now()}.mp4`);
           await ffmpegService.generateSampleVideo(samplePath, {
@@ -162,23 +178,24 @@ router.post('/start', async (req, res) => {
           }
         );
 
-        // Check file stats
+        // Persist completed exports in Cloudinary; Render's local disk is temporary.
         const stat = fs.existsSync(outputPath) ? fs.statSync(outputPath) : null;
+        if (!stat) throw new Error('Render output file was not created.');
+        const exportedAsset = await cloudinaryStorage.uploadFile(outputPath, { folder: 'reddy-ai-studio/exports', resourceType: 'video' });
         renderJobsStore.update(jobId, {
-          status: 'completed',
-          stage: 'completed',
-          progress: 100,
-          fileSize: stat ? stat.size : 0,
+          status: 'completed', stage: 'completed', progress: 100,
+          fileSize: stat.size, outputUrl: exportedAsset.secure_url,
+          cloudinaryPublicId: exportedAsset.public_id,
+          downloadUrl: exportedAsset.secure_url,
           completedAt: new Date().toISOString()
         });
-
         broadcastJobUpdate(jobId, {
-          status: 'completed',
-          stage: 'completed',
-          progress: 100,
-          fileSize: stat ? stat.size : 0,
-          downloadUrl: `/api/render/download/${jobId}`
+          status: 'completed', stage: 'completed', progress: 100,
+          fileSize: stat.size, outputUrl: exportedAsset.secure_url,
+          downloadUrl: exportedAsset.secure_url
         });
+        try { fs.unlinkSync(outputPath); } catch (_) {}
+        if (downloadedSourcePath) { try { fs.unlinkSync(downloadedSourcePath); } catch (_) {} }
 
       } catch (renderErr) {
         console.error('[RenderRoutes] Render job failed:', renderErr);
@@ -213,6 +230,7 @@ router.get('/download/:jobId', (req, res) => {
   const job = renderJobsStore.findById(req.params.jobId);
   if (!job) return res.status(404).send('Render job not found');
 
+  if (job.outputUrl) return res.redirect(302, job.outputUrl);
   const filePath = path.join(EXPORTS_DIR, job.outputFilename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).send('Exported file not found or still processing');
