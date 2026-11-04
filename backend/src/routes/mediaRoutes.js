@@ -11,6 +11,7 @@ const path = require('path');
 const fs = require('fs');
 const { ffmpegService } = require('../services/ffmpegService');
 const { mediaStore } = require('../database/jsonStore');
+const cloudinaryStorage = require('../services/cloudinaryStorage');
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -27,7 +28,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
+  limits: { fileSize: Number(process.env.MAX_UPLOAD_MB || 100) * 1024 * 1024 }, // Cloudinary upload limit configured by env
   fileFilter: (req, file, cb) => {
     const allowed = /mp4|mov|webm|mkv|avi|m4v/i;
     const ext = path.extname(file.originalname).replace('.', '');
@@ -58,24 +59,27 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 
     const filePath = req.file.path;
     const fileName = req.file.filename;
-
     console.log(`[MediaRoutes] Analyzing uploaded video: ${filePath}`);
 
-    // Probe metadata using FFprobe
+    // Analyze locally, then persist the original video and thumbnail in Cloudinary.
     const metadata = await ffmpegService.probe(filePath);
-
-    // Generate thumbnail
     const thumbName = `thumb_${path.parse(fileName).name}.jpg`;
     const thumbPath = path.join(UPLOAD_DIR, thumbName);
     await ffmpegService.extractThumbnail(filePath, thumbPath, Math.min(2.0, metadata.duration / 2));
+    const [videoAsset, thumbnailAsset] = await Promise.all([
+      cloudinaryStorage.uploadFile(filePath, { folder: 'reddy-ai-studio/media', resourceType: 'video' }),
+      cloudinaryStorage.uploadFile(thumbPath, { folder: 'reddy-ai-studio/thumbnails', resourceType: 'image' })
+    ]);
 
     const mediaRecord = {
       id: `media_${Date.now()}`,
       originalName: req.file.originalname,
       fileName: fileName,
-      filePath: filePath,
-      thumbnailUrl: `/api/media/file/${thumbName}`,
-      videoUrl: `/api/media/file/${fileName}`,
+      filePath: null,
+      cloudinaryPublicId: videoAsset.public_id,
+      cloudinaryThumbnailPublicId: thumbnailAsset.public_id,
+      thumbnailUrl: thumbnailAsset.secure_url,
+      videoUrl: videoAsset.secure_url,
       fileSize: req.file.size,
       duration: metadata.duration,
       width: metadata.width,
@@ -86,6 +90,8 @@ router.post('/upload', upload.single('video'), async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    try { fs.unlinkSync(filePath); } catch (_) {}
+    try { fs.unlinkSync(thumbPath); } catch (_) {}
     const saved = mediaStore.create(mediaRecord);
     res.status(201).json({ success: true, media: saved });
   } catch (err) {
@@ -116,13 +122,19 @@ router.post('/generate-sample', async (req, res) => {
     const thumbPath = path.join(UPLOAD_DIR, thumbName);
     await ffmpegService.extractThumbnail(sampleFilePath, thumbPath, 1.0);
 
+    const [videoAsset, thumbnailAsset] = await Promise.all([
+      cloudinaryStorage.uploadFile(sampleFilePath, { folder: 'reddy-ai-studio/samples', resourceType: 'video' }),
+      cloudinaryStorage.uploadFile(thumbPath, { folder: 'reddy-ai-studio/thumbnails', resourceType: 'image' })
+    ]);
     const record = {
       id: `media_sample_${Date.now()}`,
       originalName: `${title}.mp4`,
       fileName: sampleFileName,
-      filePath: sampleFilePath,
-      thumbnailUrl: `/api/media/file/${thumbName}`,
-      videoUrl: `/api/media/file/${sampleFileName}`,
+      filePath: null,
+      cloudinaryPublicId: videoAsset.public_id,
+      cloudinaryThumbnailPublicId: thumbnailAsset.public_id,
+      thumbnailUrl: thumbnailAsset.secure_url,
+      videoUrl: videoAsset.secure_url,
       fileSize: fs.statSync(sampleFilePath).size,
       duration: metadata.duration,
       width: metadata.width,
@@ -134,6 +146,8 @@ router.post('/generate-sample', async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    try { fs.unlinkSync(sampleFilePath); } catch (_) {}
+    try { fs.unlinkSync(thumbPath); } catch (_) {}
     const saved = mediaStore.create(record);
     res.json({ success: true, media: saved });
   } catch (err) {
