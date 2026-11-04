@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { aiVideoGenService } = require('../services/aiVideoGenService');
 const { aiGenerationsStore, mediaStore } = require('../database/jsonStore');
+const cloudinaryStorage = require('../services/cloudinaryStorage');
 
 const EXPORTS_DIR = path.join(__dirname, '..', '..', 'exports');
 
@@ -37,15 +38,20 @@ router.post('/render', async (req, res) => {
     const outPath = path.join(EXPORTS_DIR, outFilename);
 
     const result = await aiVideoGenService.renderGeneratedVideo(storyboard, outPath);
+    const cloudAsset = await cloudinaryStorage.uploadFile(outPath, { folder: 'reddy-ai-studio/ai-generated', resourceType: 'video' });
+    const thumbnailUrl = cloudinaryStorage.cloudinary.url(cloudAsset.public_id, { resource_type: 'video', format: 'jpg', secure: true });
+    try { fs.unlinkSync(outPath); } catch (_) {}
 
     // Save as media asset
     const mediaRecord = {
       id: `media_gen_${Date.now()}`,
       originalName: `${storyboard.conceptPrompt.substring(0, 24)}.mp4`,
       fileName: outFilename,
-      filePath: outPath,
-      thumbnailUrl: `/api/media/file/thumb_sample.jpg`,
-      videoUrl: `/api/render/download/${outFilename}`,
+      filePath: null,
+      cloudinaryPublicId: cloudAsset.public_id,
+      thumbnailUrl,
+      videoUrl: cloudAsset.secure_url,
+      outputUrl: cloudAsset.secure_url,
       duration: storyboard.totalDurationSec,
       aspectRatio: storyboard.aspectRatio,
       isAiGenerated: true,
