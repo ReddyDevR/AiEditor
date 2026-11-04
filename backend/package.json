@@ -1,0 +1,20 @@
+{
+  "name": "reddy-ai-studio-backend",
+  "version": "2.5.0",
+  "description": "REDDY AI STUDIO Video Processing & Multi-Agent Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "mongoose": "^8.9.5",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/s3-request-presigner": "^3.750.0",
+    "dotenv": "^16.4.7"
+  }
+}
