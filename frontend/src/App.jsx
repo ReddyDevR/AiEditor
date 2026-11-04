@@ -10,6 +10,7 @@ import AiVideoGen from './components/generate/AiVideoGen';
 import TemplatePicker from './components/templates/TemplatePicker';
 import ExportModal from './components/export/ExportModal';
 import MultiTrackTimeline from './components/editor/MultiTrackTimeline';
+import AutonomousEditor from './components/AutonomousEditor';
 
 export default function App() {
   const [activeView, setActiveView] = useState('studio');
@@ -234,17 +235,7 @@ export default function App() {
             <LandingPage onLaunchStudio={() => setActiveView('studio')} />
           )}
 
-          {activeView === 'studio' && (
-            <StudioWorkspace
-              currentProject={currentProject}
-              onUpdateProject={handleUpdateProject}
-              onSendMessage={handleSendMessage}
-              onApprovePlan={handleApprovePlan}
-              isThinking={isThinking}
-              activePlan={activePlan}
-              onOpenExport={() => setIsExportOpen(true)}
-            />
-          )}
+          {activeView === 'studio' && <AutonomousEditor />}
 
           {activeView === 'editor' && (
             <div className="flex-1 flex flex-col p-4 space-y-4 overflow-y-auto">
