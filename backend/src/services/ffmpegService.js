@@ -334,6 +334,7 @@ class FFmpegService {
 
       const child = spawn(this.ffmpegPath, args);
       let durationTotal = 15.0;
+      this.probe(inputVideo).then(info => { durationTotal = Math.max(1, info.duration || 15); }).catch(() => {});
 
       child.stderr.on('data', (chunk) => {
         const line = chunk.toString();
