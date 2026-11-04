@@ -6,6 +6,6 @@ RUN npm install --omit=dev
 COPY src ./src
 COPY python_worker ./python_worker
 RUN mkdir -p /var/data/uploads /var/data/exports /var/data/data
-ENV NODE_ENV=production PORT=10000 STORAGE_PROVIDER=r2
+ENV NODE_ENV=production PORT=10000 STORAGE_PROVIDER=cloudinary
 EXPOSE 10000
 CMD ["node", "src/server.js"]
