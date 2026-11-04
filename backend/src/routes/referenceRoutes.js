@@ -15,7 +15,7 @@ const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 const upload = multer({
   dest: UPLOAD_DIR,
-  limits: { fileSize: 300 * 1024 * 1024 }
+  limits: { fileSize: Number(process.env.MAX_UPLOAD_MB || 100) * 1024 * 1024 }
 });
 
 // POST /api/reference/analyze - analyze reference video or public URL
